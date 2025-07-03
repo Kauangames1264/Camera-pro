@@ -1,90 +1,34 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">  
-  <title>Web Camera App</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Camera App v1.1</title>
   <style>
-    /* Reset básico */
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body, html {
-      width: 100%; height: 100%;
-      font-family: Arial, sans-serif;
-      background: #000;
-      overflow: hidden;
-    }
-    /* Overlay de consentimento */
-    #consent-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0, 0, 0, 0.85);
-      display: flex; justify-content: center; align-items: center;
-      color: #fff; text-align: center; padding: 20px;
-      z-index: 100;
-    }
-    #consent-overlay .box {
-      background: #222; padding: 20px; border-radius: 8px;
-      max-width: 90%;
-    }
-    #consent-overlay button {
-      margin: 10px; padding: 10px 20px;
-      font-size: 16px; border: none; border-radius: 4px;
-      cursor: pointer;
-    }
-    /* Container principal */
-    #app {
-      display: none;
-      width: 100%; height: 100%;
-      position: relative;
-      overflow: hidden;
-      display: flex; flex-direction: column; align-items: center;
-    }
-    /* Container responsivo para vídeo */
-    .video-container {
-      flex: 1; width: 100%;
-      max-width: 1280px; max-height: 720px;
-      background: #000; display: flex;
-      justify-content: center; align-items: center;
-    }
-    video {
-      width: 100%; height: auto;
-      max-height: 100%; object-fit: contain;
-    }
-    /* Controles abaixo do vídeo */
-    .controls {
-      width: 100%; max-width: 1280px;
-      background: rgba(0,0,0,0.6);
-      padding: 10px; display: flex;
-      flex-wrap: wrap; justify-content: space-around;
-      align-items: center;
-    }
-    .zoom-presets button,
-    #capture-btn {
-      margin: 5px; padding: 8px 12px;
-      border: none; border-radius: 4px;
-      cursor: pointer;
-    }
-    .controls label,
-    .controls select,
-    .controls input,
-    .controls a {
-      margin: 5px;
-    }
+    body, html { width: 100%; height: 100%; font-family: Arial, sans-serif; background: #000; overflow: hidden; }
+    #consent-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; color: #fff; text-align: left; padding: 20px; z-index: 100; }
+    #consent-overlay .box { background: #222; padding: 20px; border-radius: 8px; max-width: 90%; line-height: 1.4; }
+    #consent-overlay button { margin: 10px 5px 0; padding: 10px 20px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; }
+    #app { display: none; width: 100%; height: 100%; position: relative; overflow: hidden; flex-direction: column; align-items: center; display: flex; }
+    .video-container { flex: 1; width: 100%; max-width: 1280px; max-height: 720px; background: #000; display: flex; justify-content: center; align-items: center; }
+    video { width: 100%; height: auto; max-height: 100%; object-fit: contain; }
+    .controls { width: 100%; max-width: 1280px; background: rgba(0,0,0,0.6); padding: 10px; display: flex; flex-wrap: wrap; justify-content: space-around; align-items: center; }
+    .zoom-presets button, #capture-btn { margin: 5px; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; }
+    .controls label, .controls select, .controls input, .controls a, .controls span { margin: 5px; color: #fff; }
     #zoom-slider { flex: 1; min-width: 100px; }
-    #download-link {
-      display: none; padding: 6px 12px;
-      background: #007bff; color: #fff;
-      text-decoration: none; border-radius: 4px;
-    }
+    #download-link { display: none; padding: 6px 12px; background: #007bff; color: #fff; text-decoration: none; border-radius: 4px; }
+    #version { position: absolute; top: 5px; right: 10px; color: #fff; font-size: 14px; z-index: 50; }
   </style>
 </head>
 <body>
+  <div id="version">v1.1</div>
   <div id="consent-overlay">
     <div class="box">
-      <p>Este site usa todas as funções da câmera do seu dispositivo para melhorar a qualidade de fotos e vídeos.<br>
-      Hospedado via HTTPS, nunca invasão de privacidade — mas fique alerta a possíveis invasores. <br>
-      Uso prolongado pode consumir bateria e danificar o hardware.<br>
-      Reporte bugs nas nossas páginas oficiais.</p>
-      <p>Após ler, você concorda com os termos?</p>
+      <p>->Este site tem um objetivo de usar completamente as funcao do celular, tornando mais eficiente e aprimorar a qualidade das fotos ou videos, por questoes de seguranca ele  esta hospedade online,por usar servico https, mais não se preocupe de nenhuma forma queremos invadir sua privacidade, como dito e apenas um um site de app de camera,mesmo assim tome cuidado,pois invassore pode se conectar de mel fé,CUIDADO.<br>
+      -> outro ponto que deve ter atencao e que os recurso preste usar pode consumir bateria e o uso prologado pode danificar as cameras<br>
+      -> casso encontre bugs relate para nos nas paginas oficiais<br>
+      APOS LER VOCE CONCORDA COM OS TERMO DE SEGURACA E CONDULTA</p>
       <button id="agree-btn">SIM</button>
       <button id="decline-btn">NÃO</button>
     </div>
@@ -103,14 +47,17 @@
       </div>
       <label>Zoom: <span id="zoom-value">1</span>×</label>
       <input type="range" id="zoom-slider" min="1" max="100" value="1">
-      <label>Resolução:</label>
-      <select id="resolution-select">
-        <option value="640x480">480p</option>
-        <option value="1280x760">760p</option>
-        <option value="1920x1080">1080p</option>
-        <option value="2560x1440">2K</option>
-        <option value="3840x2160">4K</option>
-      </select>
+      <div>
+        <label for="resolution-select">Resolução:</label>
+        <select id="resolution-select">
+          <option value="640x480">480p (640×480)</option>
+          <option value="1280x760">760p (1280×760)</option>
+          <option value="1920x1080">1080p (1920×1080)</option>
+          <option value="2560x1440">2K (2560×1440)</option>
+          <option value="3840x2160">4K (3840×2160)</option>
+        </select>
+        <span id="resolution-display">480p (640×480)</span>
+      </div>
       <button id="capture-btn">Tirar Foto</button>
       <a id="download-link" download="foto.png">Baixar Foto</a>
     </div>
@@ -128,10 +75,13 @@
     const zoomValue = document.getElementById('zoom-value');
     const presets = document.querySelectorAll('.zoom-presets button');
     const resolutionSelect = document.getElementById('resolution-select');
+    const resolutionDisplay = document.getElementById('resolution-display');
     const captureBtn = document.getElementById('capture-btn');
     const downloadLink = document.getElementById('download-link');
     const canvas = document.getElementById('canvas');
+    let track;
 
+    // Consentimento
     agreeBtn.addEventListener('click', () => {
       consentOverlay.style.display = 'none';
       app.style.display = 'flex';
@@ -142,25 +92,38 @@
       setTimeout(() => window.close(), 1500);
     });
 
+    // Atualiza display de resolução
+    resolutionSelect.addEventListener('change', () => {
+      const text = resolutionSelect.options[resolutionSelect.selectedIndex].text;
+      resolutionDisplay.textContent = text;
+    });
+
     async function startCamera() {
       try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' } } });
+        video.srcObject = stream;
+        track = stream.getVideoTracks()[0];
+      } catch (err) {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
-      } catch (err) {
-        alert('Erro ao acessar a câmera: ' + err.message);
+        track = stream.getVideoTracks()[0];
       }
     }
 
-    zoomSlider.oninput = () => {
-      const z = zoomSlider.value;
+    // Zoom
+    zoomSlider.oninput = async () => {
+      const z = parseFloat(zoomSlider.value);
       zoomValue.textContent = z;
-      video.style.transform = `scale(${z})`;
+      if (track && track.getCapabilities().zoom) {
+        try { await track.applyConstraints({ advanced: [{ zoom: z }] }); } catch {};
+      }
     };
     presets.forEach(btn => btn.addEventListener('click', () => {
       zoomSlider.value = btn.dataset.zoom;
       zoomSlider.oninput();
     }));
 
+    // Captura de foto
     captureBtn.addEventListener('click', () => {
       const [w, h] = resolutionSelect.value.split('x').map(Number);
       canvas.width = w; canvas.height = h;
