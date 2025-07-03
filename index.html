@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Web Camera App v1.10</title>
+  <title>Web Camera App v1.11</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body, html { width: 100%; height: 100%; font-family: Arial, sans-serif; background: #000; overflow: hidden; }
@@ -23,7 +23,7 @@
   </style>
 </head>
 <body>
-  <div id="version">v1.10</div>
+  <div id="version">v1.11</div>
   <div id="consent-overlay">
     <div class="box">
       <p>
@@ -54,11 +54,11 @@
       <div>
         <label for="resolution-select">Resolução:</label>
         <select id="resolution-select">
-          <option value="640x480">480p (640×480)</option>
-          <option value="1280x720">720p (1280×720)</option>
-          <option value="1920x1080" selected>1080p (1920×1080)</option>
-          <option value="2560x1440">2K (2560×1440)</option>
           <option value="3840x2160">4K (3840×2160)</option>
+          <option value="2560x1440">2K (2560×1440)</option>
+          <option value="1920x1080" selected>1080p (1920×1080)</option>
+          <option value="1280x720">720p (1280×720)</option>
+          <option value="640x480">480p (640×480)</option>
         </select>
         <span id="resolution-display">1080p</span>
       </div>
@@ -84,6 +84,7 @@
     const downloadLink = document.getElementById('download-link');
     const canvas = document.getElementById('canvas');
     let stream, track;
+
     const resolutions = [
       { label: '4K', value: '3840x2160' },
       { label: '2K', value: '2560x1440' },
@@ -92,48 +93,76 @@
       { label: '480p', value: '640x480' }
     ];
 
-    agreeBtn.onclick = () => { consentOverlay.style.display='none'; app.style.display='flex'; startCamera(); };
-    declineBtn.onclick = () => { consentOverlay.innerHTML='<div class="box"><p>Você recusou os termos. O site será fechado.</p></div>'; setTimeout(()=>window.close(),1500); };
+    agreeBtn.onclick = () => {
+      consentOverlay.style.display = 'none';
+      app.style.display = 'flex';
+      startCameraWithFallback();
+    };
 
-    resolutionSelect.onchange = () => { resolutionDisplay.textContent = resolutionSelect.selectedOptions[0].text; startCamera(); };
+    declineBtn.onclick = () => {
+      consentOverlay.innerHTML = '<div class="box"><p>Você recusou os termos. O site será fechado.</p></div>';
+      setTimeout(() => window.close(), 1500);
+    };
 
-    async function startCamera() {
+    resolutionSelect.onchange = () => {
+      resolutionDisplay.textContent = resolutionSelect.options[resolutionSelect.selectedIndex].text;
+      startCameraWithFallback();
+    };
+
+    async function startCameraWithFallback() {
       stopCamera();
-      let [w,h] = resolutionSelect.value.split('x').map(Number);
-      for (let res of resolutions) {
-        const [rw,rh] = res.value.split('x').map(Number);
-        if (rw<=w && rh<=h) {
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({ video:{ width:{ exact: w }, height:{ exact: h }, facingMode:'environment' } });
-            video.srcObject=stream; track=stream.getVideoTracks()[0];
-            const s = track.getSettings();
-            if (s.width===w && s.height===h) return;
-            throw new Error();
-          } catch(e) {
-            // tenta resolução inferior
-            console.warn(`Resolução ${w}×${h} não suportada, tentando ${rw}×${rh}`);
-            w=rw; h=rh;
-            resolutionSelect.value=res.value;
-            resolutionDisplay.textContent=res.label;
-          }
+      const selectedIndex = resolutionSelect.selectedIndex;
+      for (let i = selectedIndex; i < resolutions.length; i++) {
+        const res = resolutions[i];
+        const [w, h] = res.value.split('x').map(Number);
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { exact: w },
+              height: { exact: h },
+              facingMode: 'environment'
+            }
+          });
+          video.srcObject = stream;
+          track = stream.getVideoTracks()[0];
+          resolutionSelect.selectedIndex = i;
+          resolutionDisplay.textContent = res.label;
+          return;
+        } catch (e) {
+          console.warn(`Resolução ${w}x${h} falhou, tentando menor...`);
         }
       }
-      alert('Nenhuma resolução suportada encontrada.');
+      alert("Nenhuma resolução suportada encontrada pelo dispositivo.");
     }
 
-    function stopCamera(){ if(stream) stream.getTracks().forEach(t=>t.stop()); }
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(t => t.stop());
+      }
+    }
 
-    zoomSlider.oninput = () => { const z=parseFloat(zoomSlider.value); zoomValue.textContent=z.toFixed(1); video.style.transform=`scale(${z})`; };
-    presets.forEach(b=>b.onclick=()=>{ zoomSlider.value=b.dataset.zoom; zoomSlider.oninput(); });
+    zoomSlider.oninput = () => {
+      const z = parseFloat(zoomSlider.value);
+      zoomValue.textContent = z.toFixed(1);
+      video.style.transform = `scale(${z})`;
+    };
+
+    presets.forEach(b => b.onclick = () => {
+      zoomSlider.value = b.dataset.zoom;
+      zoomSlider.oninput();
+    });
 
     captureBtn.onclick = () => {
-      const [cw,ch] = resolutionSelect.value.split('x').map(Number);
-      const vw=video.videoWidth, vh=video.videoHeight;
-      const z=parseFloat(zoomSlider.value), sw=vw/z, sh=vh/z, sx=(vw-sw)/2, sy=(vh-sh)/2;
-      canvas.width=cw; canvas.height=ch;
-      const ctx=canvas.getContext('2d');
-      ctx.drawImage(video,sx,sy,sw,sh,0,0,cw,ch);
-      canvas.toBlob(b=>{ downloadLink.href=URL.createObjectURL(b); downloadLink.style.display='inline-block'; },'image/png');
+      const [cw, ch] = resolutionSelect.value.split('x').map(Number);
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const z = parseFloat(zoomSlider.value), sw = vw / z, sh = vh / z, sx = (vw - sw) / 2, sy = (vh - sh) / 2;
+      canvas.width = cw; canvas.height = ch;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, cw, ch);
+      canvas.toBlob(b => {
+        downloadLink.href = URL.createObjectURL(b);
+        downloadLink.style.display = 'inline-block';
+      }, 'image/png');
     };
 
     window.onbeforeunload = stopCamera;
