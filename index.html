@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Web Camera App v1.5</title>
+  <title>Web Camera App v1.7</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body, html { width: 100%; height: 100%; font-family: Arial, sans-serif; background: #000; overflow: hidden; }
@@ -11,7 +11,7 @@
     #consent-overlay .box { background: #222; padding: 20px; border-radius: 8px; max-width: 90%; line-height: 1.4; }
     #consent-overlay button { margin: 10px 5px 0; padding: 10px 20px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; }
     #app { display: none; width: 100%; height: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
-    .video-container { flex: 1; width: 100%; max-width: 1280px; max-height: 720px; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+    .video-container { flex: 1; width: 100%; max-width: 1280px; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; }
     video { width: 100%; height: auto; max-height: 100%; object-fit: contain; transform-origin: center center; transition: transform 0.2s ease; }
     .controls { width: 100%; max-width: 1280px; background: rgba(0,0,0,0.6); padding: 10px; display: flex; flex-wrap: wrap; justify-content: space-around; align-items: center; }
     .zoom-presets button, #capture-btn { margin: 5px; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; }
@@ -22,7 +22,7 @@
   </style>
 </head>
 <body>
-  <div id="version">v1.5</div>
+  <div id="version">v1.7</div>
   <div id="consent-overlay">
     <div class="box">
       <p>
@@ -44,22 +44,22 @@
     <div class="controls">
       <div class="zoom-presets">
         <button data-zoom="1">1×</button>
-        <button data-zoom="2">2×</button>
-        <button data-zoom="5">5×</button>
         <button data-zoom="10">10×</button>
+        <button data-zoom="50">50×</button>
+        <button data-zoom="100">100×</button>
       </div>
       <label>Zoom: <span id="zoom-value">1.0</span>×</label>
       <input type="range" id="zoom-slider" min="1" max="100" step="1" value="1">
       <div>
         <label for="resolution-select">Resolução:</label>
         <select id="resolution-select">
-          <option value="640x480">480p (640×480)</option>
-          <option value="1280x760">760p (1280×760)</option>
-          <option value="1920x1080" selected>1080p (1920×1080)</option>
-          <option value="2560x1440">2K (2560×1440)</option>
-          <option value="3840x2160">4K (3840×2160)</option>
+          <option value="640x480">480p</option>
+          <option value="1280x720">720p</option>
+          <option value="1920x1080" selected>1080p</option>
+          <option value="2560x1440">2K</option>
+          <option value="3840x2160">4K</option>
         </select>
-        <span id="resolution-display">1080p (1920×1080)</span>
+        <span id="resolution-display">1080p</span>
       </div>
       <button id="capture-btn">Tirar Foto</button>
       <a id="download-link" download="foto.png">Baixar Foto</a>
@@ -82,13 +82,16 @@
     const captureBtn = document.getElementById('capture-btn');
     const downloadLink = document.getElementById('download-link');
     const canvas = document.getElementById('canvas');
+
     let stream;
+    let track;
 
     agreeBtn.addEventListener('click', () => {
       consentOverlay.style.display = 'none';
       app.style.display = 'flex';
-      initCamera();
+      startCamera();
     });
+
     declineBtn.addEventListener('click', () => {
       consentOverlay.innerHTML = '<div class="box"><p>Você recusou os termos. O site será fechado.</p></div>';
       setTimeout(() => window.close(), 1500);
@@ -96,18 +99,25 @@
 
     resolutionSelect.addEventListener('change', () => {
       resolutionDisplay.textContent = resolutionSelect.options[resolutionSelect.selectedIndex].text;
-      restartCamera();
+      startCamera();
     });
 
-    async function initCamera() {
-      const [w, h] = resolutionSelect.value.split('x').map(Number);
+    async function startCamera() {
       stopCamera();
+      const [w, h] = resolutionSelect.value.split('x').map(Number);
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: w, height: h } });
-      } catch {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width: w, height: h } });
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { exact: w },
+            height: { exact: h },
+            facingMode: 'environment'
+          }
+        });
+        video.srcObject = stream;
+        track = stream.getVideoTracks()[0];
+      } catch (e) {
+        console.error('Erro ao acessar a câmera:', e);
       }
-      video.srcObject = stream;
     }
 
     function stopCamera() {
@@ -116,15 +126,12 @@
       }
     }
 
-    function restartCamera() {
-      initCamera();
-    }
-
     zoomSlider.oninput = () => {
-      const z = parseFloat(zoomSlider.value);
-      zoomValue.textContent = z.toFixed(1);
-      video.style.transform = `scale(${z})`;
+      const zoom = parseFloat(zoomSlider.value);
+      zoomValue.textContent = zoom.toFixed(1);
+      video.style.transform = `scale(${zoom})`;
     };
+
     presets.forEach(btn => btn.addEventListener('click', () => {
       zoomSlider.value = btn.dataset.zoom;
       zoomSlider.oninput();
@@ -135,11 +142,11 @@
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext('2d');
-      const z = parseFloat(zoomSlider.value);
+      const zoom = parseFloat(zoomSlider.value);
       const vw = video.videoWidth;
       const vh = video.videoHeight;
-      const sw = vw / z;
-      const sh = vh / z;
+      const sw = vw / zoom;
+      const sh = vh / zoom;
       const sx = (vw - sw) / 2;
       const sy = (vh - sh) / 2;
       ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
