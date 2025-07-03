@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">  
+  <title>Web Camera App</title>
+  <style>
+    /* Reset básico */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html {
+      width: 100%; height: 100%;
+      font-family: Arial, sans-serif;
+      background: #000;
+      overflow: hidden;
+    }
+    /* Overlay de consentimento */
+    #consent-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex; justify-content: center; align-items: center;
+      color: #fff; text-align: center; padding: 20px;
+      z-index: 100;
+    }
+    #consent-overlay .box {
+      background: #222; padding: 20px; border-radius: 8px;
+      max-width: 90%;
+    }
+    #consent-overlay button {
+      margin: 10px; padding: 10px 20px;
+      font-size: 16px; border: none; border-radius: 4px;
+      cursor: pointer;
+    }
+    /* Container principal */
+    #app {
+      display: none;
+      width: 100%; height: 100%;
+      position: relative;
+      overflow: hidden;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    /* Container responsivo para vídeo */
+    .video-container {
+      flex: 1; width: 100%;
+      max-width: 1280px; max-height: 720px;
+      background: #000; display: flex;
+      justify-content: center; align-items: center;
+    }
+    video {
+      width: 100%; height: auto;
+      max-height: 100%; object-fit: contain;
+    }
+    /* Controles abaixo do vídeo */
+    .controls {
+      width: 100%; max-width: 1280px;
+      background: rgba(0,0,0,0.6);
+      padding: 10px; display: flex;
+      flex-wrap: wrap; justify-content: space-around;
+      align-items: center;
+    }
+    .zoom-presets button,
+    #capture-btn {
+      margin: 5px; padding: 8px 12px;
+      border: none; border-radius: 4px;
+      cursor: pointer;
+    }
+    .controls label,
+    .controls select,
+    .controls input,
+    .controls a {
+      margin: 5px;
+    }
+    #zoom-slider { flex: 1; min-width: 100px; }
+    #download-link {
+      display: none; padding: 6px 12px;
+      background: #007bff; color: #fff;
+      text-decoration: none; border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="consent-overlay">
+    <div class="box">
+      <p>Este site usa todas as funções da câmera do seu dispositivo para melhorar a qualidade de fotos e vídeos.<br>
+      Hospedado via HTTPS, nunca invasão de privacidade — mas fique alerta a possíveis invasores. <br>
+      Uso prolongado pode consumir bateria e danificar o hardware.<br>
+      Reporte bugs nas nossas páginas oficiais.</p>
+      <p>Após ler, você concorda com os termos?</p>
+      <button id="agree-btn">SIM</button>
+      <button id="decline-btn">NÃO</button>
+    </div>
+  </div>
+
+  <div id="app">
+    <div class="video-container">
+      <video id="video" autoplay playsinline></video>
+    </div>
+    <div class="controls">
+      <div class="zoom-presets">
+        <button data-zoom="1">1×</button>
+        <button data-zoom="2">2×</button>
+        <button data-zoom="5">5×</button>
+        <button data-zoom="10">10×</button>
+      </div>
+      <label>Zoom: <span id="zoom-value">1</span>×</label>
+      <input type="range" id="zoom-slider" min="1" max="100" value="1">
+      <label>Resolução:</label>
+      <select id="resolution-select">
+        <option value="640x480">480p</option>
+        <option value="1280x760">760p</option>
+        <option value="1920x1080">1080p</option>
+        <option value="2560x1440">2K</option>
+        <option value="3840x2160">4K</option>
+      </select>
+      <button id="capture-btn">Tirar Foto</button>
+      <a id="download-link" download="foto.png">Baixar Foto</a>
+    </div>
+  </div>
+
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <script>
+    const consentOverlay = document.getElementById('consent-overlay');
+    const agreeBtn = document.getElementById('agree-btn');
+    const declineBtn = document.getElementById('decline-btn');
+    const app = document.getElementById('app');
+    const video = document.getElementById('video');
+    const zoomSlider = document.getElementById('zoom-slider');
+    const zoomValue = document.getElementById('zoom-value');
+    const presets = document.querySelectorAll('.zoom-presets button');
+    const resolutionSelect = document.getElementById('resolution-select');
+    const captureBtn = document.getElementById('capture-btn');
+    const downloadLink = document.getElementById('download-link');
+    const canvas = document.getElementById('canvas');
+
+    agreeBtn.addEventListener('click', () => {
+      consentOverlay.style.display = 'none';
+      app.style.display = 'flex';
+      startCamera();
+    });
+    declineBtn.addEventListener('click', () => {
+      consentOverlay.innerHTML = '<div class="box"><p>Você recusou os termos. O site será fechado.</p></div>';
+      setTimeout(() => window.close(), 1500);
+    });
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (err) {
+        alert('Erro ao acessar a câmera: ' + err.message);
+      }
+    }
+
+    zoomSlider.oninput = () => {
+      const z = zoomSlider.value;
+      zoomValue.textContent = z;
+      video.style.transform = `scale(${z})`;
+    };
+    presets.forEach(btn => btn.addEventListener('click', () => {
+      zoomSlider.value = btn.dataset.zoom;
+      zoomSlider.oninput();
+    }));
+
+    captureBtn.addEventListener('click', () => {
+      const [w, h] = resolutionSelect.value.split('x').map(Number);
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, w, h);
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        downloadLink.href = url;
+        downloadLink.style.display = 'inline-block';
+      }, 'image/png');
+    });
+  </script>
+</body>
+</html>
