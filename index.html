@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Web Camera App v1.1</title>
+  <title>Web Camera App v1.5</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body, html { width: 100%; height: 100%; font-family: Arial, sans-serif; background: #000; overflow: hidden; }
     #consent-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; color: #fff; text-align: left; padding: 20px; z-index: 100; }
     #consent-overlay .box { background: #222; padding: 20px; border-radius: 8px; max-width: 90%; line-height: 1.4; }
     #consent-overlay button { margin: 10px 5px 0; padding: 10px 20px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; }
-    #app { display: none; width: 100%; height: 100%; position: relative; overflow: hidden; flex-direction: column; align-items: center; display: flex; }
-    .video-container { flex: 1; width: 100%; max-width: 1280px; max-height: 720px; background: #000; display: flex; justify-content: center; align-items: center; }
-    video { width: 100%; height: auto; max-height: 100%; object-fit: contain; }
+    #app { display: none; width: 100%; height: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+    .video-container { flex: 1; width: 100%; max-width: 1280px; max-height: 720px; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+    video { width: 100%; height: auto; max-height: 100%; object-fit: contain; transform-origin: center center; transition: transform 0.2s ease; }
     .controls { width: 100%; max-width: 1280px; background: rgba(0,0,0,0.6); padding: 10px; display: flex; flex-wrap: wrap; justify-content: space-around; align-items: center; }
     .zoom-presets button, #capture-btn { margin: 5px; padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; }
     .controls label, .controls select, .controls input, .controls a, .controls span { margin: 5px; color: #fff; }
@@ -22,13 +22,16 @@
   </style>
 </head>
 <body>
-  <div id="version">v1.1</div>
+  <div id="version">v1.5</div>
   <div id="consent-overlay">
     <div class="box">
-      <p>->Este site tem um objetivo de usar completamente as funcao do celular, tornando mais eficiente e aprimorar a qualidade das fotos ou videos, por questoes de seguranca ele  esta hospedade online,por usar servico https, mais não se preocupe de nenhuma forma queremos invadir sua privacidade, como dito e apenas um um site de app de camera,mesmo assim tome cuidado,pois invassore pode se conectar de mel fé,CUIDADO.<br>
-      -> outro ponto que deve ter atencao e que os recurso preste usar pode consumir bateria e o uso prologado pode danificar as cameras<br>
-      -> casso encontre bugs relate para nos nas paginas oficiais<br>
-      APOS LER VOCE CONCORDA COM OS TERMO DE SEGURACA E CONDULTA</p>
+      <p>
+        ->Este site tem um objetivo de usar completamente as funções do dispositivo, aprimorando qualidade de fotos/vídeos, hospedado via HTTPS.<br>
+        ->Não invadimos sua privacidade, mas invasores podem tentar se conectar. CUIDADO.<br>
+        ->Uso prolongado pode consumir bateria e danificar a câmera.<br>
+        ->Relate bugs nas nossas páginas oficiais.<br>
+        APÓS LER, VOCÊ CONCORDA COM OS TERMOS?
+      </p>
       <button id="agree-btn">SIM</button>
       <button id="decline-btn">NÃO</button>
     </div>
@@ -45,18 +48,18 @@
         <button data-zoom="5">5×</button>
         <button data-zoom="10">10×</button>
       </div>
-      <label>Zoom: <span id="zoom-value">1</span>×</label>
-      <input type="range" id="zoom-slider" min="1" max="100" value="1">
+      <label>Zoom: <span id="zoom-value">1.0</span>×</label>
+      <input type="range" id="zoom-slider" min="1" max="100" step="1" value="1">
       <div>
         <label for="resolution-select">Resolução:</label>
         <select id="resolution-select">
           <option value="640x480">480p (640×480)</option>
           <option value="1280x760">760p (1280×760)</option>
-          <option value="1920x1080">1080p (1920×1080)</option>
+          <option value="1920x1080" selected>1080p (1920×1080)</option>
           <option value="2560x1440">2K (2560×1440)</option>
           <option value="3840x2160">4K (3840×2160)</option>
         </select>
-        <span id="resolution-display">480p (640×480)</span>
+        <span id="resolution-display">1080p (1920×1080)</span>
       </div>
       <button id="capture-btn">Tirar Foto</button>
       <a id="download-link" download="foto.png">Baixar Foto</a>
@@ -79,62 +82,75 @@
     const captureBtn = document.getElementById('capture-btn');
     const downloadLink = document.getElementById('download-link');
     const canvas = document.getElementById('canvas');
-    let track;
+    let stream;
 
-    // Consentimento
     agreeBtn.addEventListener('click', () => {
       consentOverlay.style.display = 'none';
       app.style.display = 'flex';
-      startCamera();
+      initCamera();
     });
     declineBtn.addEventListener('click', () => {
       consentOverlay.innerHTML = '<div class="box"><p>Você recusou os termos. O site será fechado.</p></div>';
       setTimeout(() => window.close(), 1500);
     });
 
-    // Atualiza display de resolução
     resolutionSelect.addEventListener('change', () => {
-      const text = resolutionSelect.options[resolutionSelect.selectedIndex].text;
-      resolutionDisplay.textContent = text;
+      resolutionDisplay.textContent = resolutionSelect.options[resolutionSelect.selectedIndex].text;
+      restartCamera();
     });
 
-    async function startCamera() {
+    async function initCamera() {
+      const [w, h] = resolutionSelect.value.split('x').map(Number);
+      stopCamera();
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' } } });
-        video.srcObject = stream;
-        track = stream.getVideoTracks()[0];
-      } catch (err) {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
-        track = stream.getVideoTracks()[0];
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: w, height: h } });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: w, height: h } });
+      }
+      video.srcObject = stream;
+    }
+
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
       }
     }
 
-    // Zoom
-    zoomSlider.oninput = async () => {
+    function restartCamera() {
+      initCamera();
+    }
+
+    zoomSlider.oninput = () => {
       const z = parseFloat(zoomSlider.value);
-      zoomValue.textContent = z;
-      if (track && track.getCapabilities().zoom) {
-        try { await track.applyConstraints({ advanced: [{ zoom: z }] }); } catch {};
-      }
+      zoomValue.textContent = z.toFixed(1);
+      video.style.transform = `scale(${z})`;
     };
     presets.forEach(btn => btn.addEventListener('click', () => {
       zoomSlider.value = btn.dataset.zoom;
       zoomSlider.oninput();
     }));
 
-    // Captura de foto
     captureBtn.addEventListener('click', () => {
       const [w, h] = resolutionSelect.value.split('x').map(Number);
-      canvas.width = w; canvas.height = h;
+      canvas.width = w;
+      canvas.height = h;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, w, h);
+      const z = parseFloat(zoomSlider.value);
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const sw = vw / z;
+      const sh = vh / z;
+      const sx = (vw - sw) / 2;
+      const sy = (vh - sh) / 2;
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
       canvas.toBlob(blob => {
         const url = URL.createObjectURL(blob);
         downloadLink.href = url;
         downloadLink.style.display = 'inline-block';
       }, 'image/png');
     });
+
+    window.addEventListener('beforeunload', stopCamera);
   </script>
 </body>
 </html>
