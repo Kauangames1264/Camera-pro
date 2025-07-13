@@ -17,13 +17,14 @@
     .controls button, .controls input, .controls select, .controls label, .controls span { margin: 5px; color: #fff; }
     .zoom-presets button { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; }
     #zoom-slider { flex: 1; min-width: 80px; }
+    #mode-toggle { margin-left: 10px; }
     #capture-btn { padding: 8px 16px; background: #28a745; border: none; border-radius: 4px; color: #fff; cursor: pointer; }
     #download-link { display: none; padding: 6px 12px; background: #007bff; color: #fff; text-decoration: none; border-radius: 4px; }
     #version { position: absolute; top: 5px; right: 10px; color: #fff; font-size: 14px; z-index: 50; }
   </style>
 </head>
 <body>
-  <div id="version">v1.13</div>
+  <div id="version">v1.15</div>
   <div id="consent-overlay">
     <div class="box">
       <p>
@@ -62,6 +63,14 @@
         </select>
         <span id="resolution-display">1080p</span>
       </div>
+      <div id="mode-toggle">
+        <label for="orientation-mode">Modo:</label>
+        <select id="orientation-mode">
+          <option value="auto">Auto</option>
+          <option value="landscape">Horizontal</option>
+          <option value="portrait">Vertical</option>
+        </select>
+      </div>
       <button id="capture-btn">Tirar Foto</button>
       <a id="download-link" download="foto.png">Baixar Foto</a>
     </div>
@@ -80,6 +89,7 @@
     const presets = document.querySelectorAll('.zoom-presets button');
     const resolutionSelect = document.getElementById('resolution-select');
     const resolutionDisplay = document.getElementById('resolution-display');
+    const orientationMode = document.getElementById('orientation-mode');
     const captureBtn = document.getElementById('capture-btn');
     const downloadLink = document.getElementById('download-link');
     const canvas = document.getElementById('canvas');
@@ -148,8 +158,13 @@
 
     captureBtn.onclick = () => {
       let [cw, ch] = resolutionSelect.value.split('x').map(Number);
-      const angle = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
-      const isPortrait = angle === 90 || angle === -90;
+      // Define modo: auto usa ângulo; senão força
+      const mode = orientationMode.value;
+      const angle = mode === 'auto'
+        ? (screen.orientation?.angle || window.orientation || 0)
+        : (mode === 'portrait' ? 90 : 0);
+      const isPortrait = mode === 'portrait' || angle === 90 || angle === -90;
+
       const canvasW = isPortrait ? ch : cw;
       const canvasH = isPortrait ? cw : ch;
 
@@ -166,7 +181,7 @@
       const sw = vw / z, sh = vh / z;
       const sx = (vw - sw) / 2, sy = (vh - sh) / 2;
 
-      // Ajustar para centralizar corretamente a imagem na rotação
+      // Centraliza o recorte de acordo com orientação
       if (isPortrait) {
         ctx.drawImage(video, sx, sy, sw, sh, -canvasH/2, -canvasW/2, canvasH, canvasW);
       } else {
