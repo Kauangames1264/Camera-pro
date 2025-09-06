@@ -1,72 +1,106 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Web Camera App v3.8</title>
+<title>Web Camera App v5.2 — Super Pixel (stacking + upscale)</title>
 <style>
-:root{--bg:#000;--accent:#00c853;--muted:#9aa0a6;--panel:rgba(0,0,0,0.55);--white:#fff}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;width:100%;background:var(--bg);font-family:Inter,Arial,Helvetica,sans-serif;color:var(--white);-webkit-user-select:none;user-select:none}
-#consent-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:flex;align-items:center;justify-content:center;z-index:2000}
-#consent-overlay .box{background:#111;padding:18px;border-radius:10px;max-width:92%;text-align:center}
-.btn{padding:10px 14px;border-radius:8px;border:none;cursor:pointer}
-.btn-accept{background:var(--accent);color:#000;font-weight:700}
-.btn-decline{background:transparent;border:1px solid rgba(255,255,255,0.08);color:#fff}
+  /* =========================
+     Estilos principais
+     ========================= */
+  :root{
+    --bg:#000;
+    --panel:rgba(0,0,0,0.6);
+    --accent:#00c853;
+    --muted:#9aa0a6;
+    --white:#ffffff;
+    --danger:#ff5252;
+    --glass: rgba(255,255,255,0.03);
+  }
+  html,body{height:100%;width:100%;margin:0;padding:0;background:var(--bg);color:var(--white);font-family:Inter,Arial,Helvetica,sans-serif; -webkit-font-smoothing:antialiased;}
+  *{box-sizing:border-box}
+  a{color:inherit}
 
-#app{display:none;position:relative;height:100dvh;width:100dvw;overflow:hidden}
-.view{position:relative;height:100%;width:100%;display:flex;align-items:center;justify-content:center;background:#000;touch-action:none}
-video#preview{width:100%;height:100%;object-fit:cover;transform-origin:center center;will-change:transform;transition:transform .18s ease}
-.topbar{position:absolute;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;z-index:1200}
-.mode-indicator{padding:6px 10px;border-radius:20px;background:rgba(0,0,0,0.4);font-size:13px;color:var(--muted)}
-.zoom-text{position:absolute;top:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);padding:8px 14px;border-radius:20px;font-weight:700;z-index:1300;opacity:0;transition:opacity .25s}
-.zoom-text.show{opacity:1}
-.modes{position:absolute;bottom:84px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:1200;background:rgba(0,0,0,0.45);padding:6px 10px;border-radius:14px}
-.mode-btn{background:transparent;border:none;color:#ddd;padding:6px 8px;border-radius:8px;cursor:pointer}
-.mode-btn.active{color:#fff;font-weight:700;text-decoration:underline}
-.controls{position:absolute;bottom:140px;width:100%;display:flex;justify-content:center;z-index:1100}
-.presets{display:flex;gap:8px;align-items:center}
-.preset{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.04);cursor:pointer}
-.preset.active{background:rgba(0,200,83,0.12);color:var(--accent)}
-.shutter{position:absolute;bottom:48px;left:50%;transform:translateX(-50%);width:64px;height:64px;border-radius:50%;background:#fff;color:#000;border:none;font-size:22px;display:flex;align-items:center;justify-content:center;z-index:1000;box-shadow:0 8px 30px rgba(0,0,0,0.6);cursor:pointer}
-.gallery-btn{position:absolute;right:18px;bottom:48px;width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,0.92);display:flex;align-items:center;justify-content:center;z-index:1000;cursor:pointer}
+  /* Container */
+  #app{position:relative;height:100dvh;width:100dvw;overflow:hidden}
 
-#mini-wrap{position:absolute;top:18px;right:18px;width:128px;height:128px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);background:#000;display:none;z-index:1200}
-#mini-video{width:100%;height:100%;object-fit:cover}
-#mini-rect{position:absolute;border:2px solid #00ff66;box-sizing:border-box;pointer-events:none}
+  /* Video preview */
+  .view{position:relative;height:100%;width:100%;display:flex;align-items:center;justify-content:center;background:#000;touch-action:none}
+  video#preview{width:100%;height:100%;object-fit:cover;transform-origin:center center;will-change:transform;transition:transform .12s linear, filter .12s linear}
+  video#preview.during-zoom{filter:blur(.6px) saturate(.98)}
 
-.settings{position:absolute;left:12px;top:56px;background:rgba(0,0,0,0.6);padding:8px;border-radius:8px;z-index:1200;display:none}
-.settings select{margin:6px 0;padding:6px;border-radius:6px;border:none;background:#111;color:#fff}
+  /* Topbar */
+  .topbar{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;z-index:1600}
+  .left-top{display:flex;gap:10px;align-items:center}
+  .mode-indicator{padding:6px 10px;border-radius:20px;background:rgba(0,0,0,0.4);font-size:13px;color:var(--muted)}
+  .status-pill{padding:6px 10px;border-radius:12px;background:var(--panel);font-size:12px;color:var(--muted)}
 
-#gallery-panel{position:fixed;right:0;top:0;height:100%;width:0;background:rgba(0,0,0,0.94);overflow:auto;transition:width .24s;z-index:1500}
-#gallery-panel.open{width:280px}
-.gallery-item{padding:12px;border-bottom:1px solid rgba(255,255,255,0.03)}
-.gallery-item img{width:100%;border-radius:8px}
+  /* Zoom text */
+  .zoom-text{position:absolute;top:18px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.6);padding:8px 14px;border-radius:20px;font-weight:700;z-index:1700;opacity:0;transition:opacity .18s}
+  .zoom-text.show{opacity:1}
 
-canvas#capture-canvas{display:none}
+  /* Controls and presets */
+  .modes{position:absolute;bottom:96px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:1400;background:rgba(0,0,0,0.45);padding:6px 10px;border-radius:14px}
+  .mode-btn{background:transparent;border:none;color:#ddd;padding:6px 8px;border-radius:8px;cursor:pointer}
+  .mode-btn.active{color:#fff;font-weight:700;text-decoration:underline}
 
-@media(max-width:420px){.presets{gap:6px}.preset{padding:5px 6px}.shutter{width:56px;height:56px}}
+  .presets{position:absolute;bottom:172px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:1400}
+  .preset{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.04);cursor:pointer}
+  .preset.active{background:rgba(0,200,83,0.12);color:var(--accent)}
+
+  /* Primary buttons */
+  .shutter{position:absolute;bottom:48px;left:50%;transform:translateX(-50%);width:66px;height:66px;border-radius:50%;background:#fff;color:#000;border:none;font-size:22px;display:flex;align-items:center;justify-content:center;z-index:1300;box-shadow:0 10px 40px rgba(0,0,0,0.6);cursor:pointer}
+  .gallery-btn{position:absolute;right:18px;bottom:48px;width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,0.92);display:flex;align-items:center;justify-content:center;z-index:1300;cursor:pointer}
+
+  /* Mini-view (sempre 1x) */
+  #mini-wrap{position:absolute;top:18px;right:18px;width:140px;height:140px;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);background:#000;display:none;z-index:1500}
+  #mini-video{width:100%;height:100%;object-fit:cover;transform:none}
+  #mini-rect{position:absolute;border:2px solid #00ff66;box-sizing:border-box;pointer-events:none;display:none}
+
+  /* Settings panel */
+  .settings{position:absolute;left:12px;top:56px;background:rgba(0,0,0,0.6);padding:8px;border-radius:8px;z-index:1500;display:none}
+  .settings label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+  .settings select{margin:6px 0;padding:6px;border-radius:6px;border:none;background:#111;color:#fff}
+
+  /* Gallery panel */
+  #gallery-panel{position:fixed;right:0;top:0;height:100%;width:0;background:rgba(0,0,0,0.94);overflow:auto;transition:width .24s;z-index:1800}
+  #gallery-panel.open{width:340px}
+  .gallery-item{padding:12px;border-bottom:1px solid rgba(255,255,255,0.03)}
+  .gallery-item img,.gallery-item video{width:100%;border-radius:8px;background:#111}
+
+  /* Indicator overlay */
+  #processing-overlay{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.8);padding:18px;border-radius:12px;z-index:2500;display:none;min-width:240px;text-align:center}
+  #processing-overlay p{margin:8px 0;color:var(--muted);font-size:14px}
+  #processing-overlay .progress{height:8px;background:rgba(255,255,255,0.06);border-radius:6px;overflow:hidden;margin-top:8px}
+  #processing-overlay .progress > i{display:block;height:100%;width:0%;background:var(--accent);transition:width .2s linear}
+
+  /* Suspended continue button (reveal long code logs or continuation) */
+  #suspend-btn{position:fixed;left:50%;transform:translateX(-50%);bottom:6px;background:var(--panel);color:var(--muted);border-radius:20px;padding:6px 12px;border:1px solid rgba(255,255,255,0.04);cursor:pointer;z-index:3000}
+  #suspend-panel{position:fixed;left:12px;right:12px;bottom:54px;background:rgba(0,0,0,0.85);padding:12px;border-radius:8px;color:var(--muted);display:none;z-index:3001;max-height:40vh;overflow:auto;font-size:13px}
+
+  /* small responsive tweaks */
+  @media(max-width:420px){
+    .presets{bottom:156px}
+    .modes{bottom:72px}
+    .shutter{width:56px;height:56px}
+    #mini-wrap{width:96px;height:96px}
+    #gallery-panel.open{width:260px}
+  }
 </style>
 </head>
 <body>
-  <div id="consent-overlay">
-    <div class="box">
-      <p>Este app usa a câmera traseira principal (wide). Fotos salvas localmente (até 7).</p>
-      <div style="margin-top:12px;display:flex;justify-content:center;gap:10px">
-        <button id="agree-btn" class="btn btn-accept">ABRIR CÂMERA</button>
-        <button id="decline-btn" class="btn btn-decline">CANCELAR</button>
-      </div>
-    </div>
-  </div>
-
+  <!-- APP -->
   <div id="app" aria-hidden="true">
     <div class="view" id="view">
       <video id="preview" autoplay playsinline muted></video>
 
       <div class="topbar">
-        <div class="mode-indicator" id="camera-info">Wide • 1×</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <div id="settings-toggle" class="mode-btn" title="Ajustes">⚙</div>
+        <div class="left-top">
+          <div class="mode-indicator" id="camera-info">Wide • 1×</div>
+          <div class="status-pill" id="connect-status">Aguardando</div>
+        </div>
+        <div>
+          <button id="settings-toggle" class="mode-btn" title="Ajustes">⚙</button>
         </div>
       </div>
 
@@ -77,121 +111,158 @@ canvas#capture-canvas{display:none}
         <button class="mode-btn" data-mode="P">FOTO / P</button>
       </div>
 
-      <div class="controls"><div class="presets" id="presets">
+      <div class="presets" id="presets">
         <button class="preset" data-zoom="1">1×</button>
         <button class="preset" data-zoom="2">2×</button>
         <button class="preset" data-zoom="5">5×</button>
         <button class="preset" data-zoom="10">10×</button>
         <button class="preset" data-zoom="20">20×</button>
-      </div></div>
+      </div>
 
       <button id="shutter" class="shutter" aria-label="Tirar foto">●</button>
       <button id="gallery-btn" class="gallery-btn" aria-label="Galeria">📷</button>
 
-      <div id="mini-wrap"><video id="mini-video" autoplay muted playsinline></video><div id="mini-rect"></div></div>
+      <div id="mini-wrap">
+        <video id="mini-video" autoplay muted playsinline></video>
+        <div id="mini-rect"></div>
+      </div>
 
       <div class="settings" id="settings">
-        <div style="margin-bottom:6px"><strong style="font-size:13px">Modo</strong></div>
+        <label>Modo</label>
         <div id="mp-panel">
           <div style="font-size:12px;color:var(--muted)">FOTO / MP</div>
           <select id="mp-select">
-            <option value="4">4MP</option><option value="8">8MP</option><option value="12" selected>12MP</option>
-            <option value="24">24MP</option><option value="36">36MP</option><option value="48">48MP</option>
+            <option value="4">4MP</option>
+            <option value="8">8MP</option>
+            <option value="12" selected>12MP</option>
+            <option value="24">24MP</option>
+            <option value="36">36MP</option>
+            <option value="48">48MP</option>
           </select>
-          <div style="height:8px"></div>
         </div>
         <div id="p-panel" style="display:none">
           <div style="font-size:12px;color:var(--muted)">FOTO / P</div>
           <select id="p-select">
-            <option value="640x480">480p</option><option value="1280x720">720p</option>
-            <option value="1920x1080" selected>1080p</option><option value="2560x1440">2K</option>
-            <option value="3840x2160">4K</option><option value="8000x6000">8K</option>
+            <option value="640x480">480p</option>
+            <option value="1280x720">720p</option>
+            <option value="1920x1080" selected>1080p</option>
+            <option value="2560x1440">2K</option>
+            <option value="3840x2160">4K</option>
+            <option value="8000x6000">8K</option>
           </select>
         </div>
         <div style="height:8px"></div>
-        <button id="apply-res" class="btn btn-accept" style="width:100%">APLICAR</button>
+        <button id="apply-res" class="mode-btn" style="background:var(--accent);color:#000;border:none;padding:8px 10px;border-radius:8px">APLICAR</button>
       </div>
 
-    </div>
+      <div id="processing-overlay" aria-hidden="true">
+        <strong id="processing-title">Processando</strong>
+        <p id="processing-msg">Preparando...</p>
+        <div class="progress"><i id="processing-bar" style="width:0%"></i></div>
+        <div style="height:6px"></div>
+        <button id="processing-cancel" class="mode-btn" style="background:transparent;color:var(--danger)">Cancelar</button>
+      </div>
 
-    <div id="gallery-panel"><div style="display:flex;justify-content:space-between;align-items:center;padding:12px;color:#fff"><strong>Galeria</strong><button id="close-gallery" style="background:none;border:none;color:#fff;font-size:20px">✕</button></div><div id="gallery-list"></div></div>
+      <div id="suspend-panel"></div>
+      <button id="suspend-btn">CONTINUAR</button>
+
+      <div id="gallery-panel" aria-hidden="true">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;color:#fff">
+          <strong>Galeria</strong>
+          <button id="close-gallery" style="background:none;border:none;color:#fff;font-size:20px">✕</button>
+        </div>
+        <div id="gallery-list"></div>
+      </div>
+    </div>
   </div>
 
-  <canvas id="capture-canvas"></canvas>
+  <!-- canvas escondido: usado para compor Super Pixel -->
+  <canvas id="stitch-canvas" style="display:none"></canvas>
 
 <script>
 /*
- v3.8 - Código completo
- Principais pontos:
- - Escolha heurística da câmera traseira principal (wide) após pedir permissão.
- - MP/P separados. Tenta aplicar resolução máxima até 8000x6000.
- - Zoom híbrido até 100x. Transição suave via RAF. Valores inteiros.
- - Pinch ajusta zoom e persiste em inteiro.
- - Mini-view ativo somente >2x. Retângulo acompanha enquadramento corretamente.
- - Captura: tenta ImageCapture.takePhoto, fallback para canvas drawImage.
- - Galeria local (max 7), persistida em localStorage.
+  Web Camera App v5.2
+  - Versão: 5.2
+  - Implementa Super Pixel via stacking (média por pixel) + upscale por canvas.
+  - Mantém fallback via MediaRecorder se ImageCapture ausente.
+  - Exibe indicador de processamento e botão "CONTINUAR".
+  - Muitas checagens para reduzir crash por limite de canvas.
+  - LocalStorage names v5_2 para evitar conflito.
 */
 
-// Helpers
+/* =========================
+   Helpers e utilitários
+   ========================= */
 const $ = id => document.getElementById(id);
-const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
-const delay = ms => new Promise(r=>setTimeout(r,ms));
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const delay = ms => new Promise(r => setTimeout(r, ms));
+const logSuspend = (msg) => {
+  const panel = $('suspend-panel');
+  const p = document.createElement('div');
+  p.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  panel.prepend(p);
+};
 
-/* Elements */
-const consent = $('consent-overlay'), agreeBtn = $('agree-btn'), declineBtn = $('decline-btn');
-const app = $('app'), view = $('view'), preview = $('preview'), miniWrap = $('mini-wrap'), miniVideo = $('mini-video'), miniRect = $('mini-rect');
-const cameraInfo = $('camera-info'), zoomText = $('zoom-text');
-const modes = $('modes'), modeBtns = modes.querySelectorAll('.mode-btn');
-const presets = $('presets'), shutter = $('shutter'), galleryBtn = $('gallery-btn');
-const settingsToggle = $('settings-toggle'), settingsPanel = $('settings'), mpSelect = $('mp-select'), pSelect = $('p-select'), applyRes = $('apply-res');
-const mpPanel = $('mp-panel'), pPanel = $('p-panel');
-const galleryPanel = $('gallery-panel'), closeGallery = $('close-gallery'), galleryList = $('gallery-list');
-const canvas = $('capture-canvas');
+/* =========================
+   Elementos do DOM
+   ========================= */
+const app = $('app');
+const view = $('view');
+const preview = $('preview');
+const miniWrap = $('mini-wrap');
+const miniVideo = $('mini-video');
+const miniRect = $('mini-rect');
+const cameraInfo = $('camera-info');
+const connectStatus = $('connect-status');
+const zoomText = $('zoom-text');
+const modes = $('modes');
+const modeBtns = modes.querySelectorAll('.mode-btn');
+const presets = $('presets');
+const shutter = $('shutter');
+const galleryBtn = $('gallery-btn');
+const settingsToggle = $('settings-toggle');
+const settingsPanel = $('settings');
+const mpSelect = $('mp-select');
+const pSelect = $('p-select');
+const applyRes = $('apply-res');
+const mpPanel = $('mp-panel');
+const pPanel = $('p-panel');
+const galleryPanel = $('gallery-panel');
+const closeGallery = $('close-gallery');
+const galleryList = $('gallery-list');
+const processingOverlay = $('processing-overlay');
+const processingTitle = $('processing-title');
+const processingMsg = $('processing-msg');
+const processingBar = $('processing-bar');
+const processingCancel = $('processing-cancel');
+const suspendBtn = $('suspend-btn');
+const suspendPanel = $('suspend-panel');
+const stitchCanvas = $('stitch-canvas');
 
+/* =========================
+   Estado interno
+   ========================= */
 let stream = null;
 let chosenDeviceId = null;
 let devices = [];
-let zoom = Number(localStorage.getItem('cam_zoom_v3')||1); // current integer zoom
-let targetZoom = zoom;
-let animating = false;
-let videoTrackCapabilities = null;
-let videoTrackSettings = null;
-let photos = JSON.parse(localStorage.getItem('cam_photos_v3')||'[]');
+let photos = JSON.parse(localStorage.getItem('cam_photos_v5_2') || '[]'); // storage v5_2
 const MAX_PHOTOS = 7;
-let desiredMode = localStorage.getItem('cam_mode_v3') || 'MP'; // MP or P
+
+let desiredMode = localStorage.getItem('cam_mode_v5_2') || 'MP'; // MP or P
 let cfg = {
-  MP: { mp: localStorage.getItem('cam_mp_v3') || '12' },
-  P:  { p: localStorage.getItem('cam_p_v3')  || '1920x1080' }
+  MP: { mp: localStorage.getItem('cam_mp_v5_2') || '12' },
+  P:  { p:  localStorage.getItem('cam_p_v5_2')  || '1920x1080' }
 };
 
-/* ---------- utility: pick rear principal wide ---------- */
-async function pickRearMain() {
-  // ensure labels available: request temporary permission with environment
-  try {
-    const tmp = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:'environment' } }, audio:false });
-    tmp.getTracks().forEach(t=>t.stop());
-  } catch(e){ /* ignore: permission flow below will handle */ }
+let zoom = Number(localStorage.getItem('cam_zoom_v5_2') || 1);
+let videoTrackCapabilities = null;
+let videoTrackSettings = null;
+let imageCapture = null;
+let processingAbort = false;
 
-  const list = await navigator.mediaDevices.enumerateDevices();
-  const cams = list.filter(d=>d.kind==='videoinput');
-  devices = cams;
-  if(!cams.length) return null;
-
-  function score(d){
-    const L = (d.label||'').toLowerCase();
-    let s = 0;
-    if(/main|wide|standard|1x|camera 0/.test(L)) s+=8;
-    if(/back|rear|environment/.test(L)) s+=4;
-    if(/video|camera/.test(L)) s+=1;
-    if(/ultra|ultrawide|0\.5x|macro|tele|zoom/.test(L)) s-=10;
-    if(/front|selfie|face|user/.test(L)) s-=20;
-    return s;
-  }
-  const sorted = cams.slice().sort((a,b)=>score(b)-score(a));
-  return sorted[0].deviceId || cams[0].deviceId;
-}
-
-/* ---------- MP to resolution mapping ---------- */
+/* =========================
+   Map MP -> resolution (aproximado)
+   ========================= */
 function mpToResolution(mp){
   mp = Number(mp);
   if(mp<=4) return {width:1920,height:1080};
@@ -202,28 +273,73 @@ function mpToResolution(mp){
   return {width:8000,height:6000};
 }
 
-/* ---------- try apply resolution steps ---------- */
-async function tryApplyResolutions(track, list){
-  if(!track || !track.applyConstraints) return;
-  for(const r of list){
-    try{
-      await track.applyConstraints({ width:{ ideal:r.width }, height:{ ideal:r.height }, advanced:[{ width:r.width, height:r.height }] });
-      const s = track.getSettings ? track.getSettings() : {};
-      if(s.width && s.height){
-        // ok if within ~90% to requested
-        if(s.width >= r.width*0.9 && s.height >= r.height*0.9) return;
-      }
-    } catch(e){ /* try next */ }
+/* =========================
+   Escolha heurística da traseira principal
+   ========================= */
+async function pickRearMain(){
+  logSuspend('pickRearMain: iniciando heurística de seleção de câmera');
+  try{
+    // Tenta obter rótulo para melhorar heurística
+    await navigator.mediaDevices.getUserMedia({video:{ facingMode:{ ideal:'environment' }}, audio:false})
+      .then(tmp => tmp.getTracks().forEach(t=>t.stop()))
+      .catch(()=>{});
+  }catch(e){
+    // Ignora
+  }
+  try{
+    const list = await navigator.mediaDevices.enumerateDevices();
+    const cams = list.filter(d=>d.kind==='videoinput');
+    devices = cams;
+    if(!cams.length) return null;
+    const score = d=>{
+      const L = (d.label||'').toLowerCase(); let s=0;
+      if(/main|wide|standard|1x|camera 0/.test(L)) s+=8;
+      if(/back|rear|environment/.test(L)) s+=4;
+      if(/ultra|ultrawide|0\.5x|macro|tele|zoom/.test(L)) s-=10;
+      if(/front|selfie|face|user/.test(L)) s-=20;
+      return s;
+    };
+    const sorted = cams.slice().sort((a,b)=>score(b)-score(a));
+    logSuspend(`pickRearMain: escolhida deviceId=${sorted[0].deviceId}`);
+    return sorted[0].deviceId || cams[0].deviceId;
+  }catch(e){
+    logSuspend('pickRearMain: erro enumerateDevices -> '+String(e));
+    return null;
   }
 }
 
-/* ---------- open camera with desired mode/resolution ---------- */
+/* =========================
+   Aplicar resoluções / constraints
+   ========================= */
+async function tryApplyResolutions(track, list){
+  if(!track?.applyConstraints) return;
+  for(const r of list){
+    try{
+      await track.applyConstraints({
+        width:{ ideal:r.width },
+        height:{ ideal:r.height },
+        advanced:[{ width:r.width, height:r.height }]
+      });
+      const s = track.getSettings?.() || {};
+      if(s.width && s.height && s.width >= r.width*0.9 && s.height >= r.height*0.9) {
+        logSuspend(`tryApplyResolutions: sucesso para ${r.width}x${r.height}`);
+        return;
+      }
+    }catch(e){
+      logSuspend(`tryApplyResolutions: falhou para ${r.width}x${r.height} -> ${e}`);
+    }
+  }
+}
+
+/* =========================
+   Abrir câmera conforme modo
+   ========================= */
 async function openCamera(deviceId){
+  processingAbort = false;
   if(stream) stream.getTracks().forEach(t=>t.stop());
   chosenDeviceId = deviceId;
-  // constraints base
+  connectStatus.textContent = 'Conectando...';
   let constraints = { audio:false, video:{ deviceId:{ exact: deviceId }, facingMode:'environment', aspectRatio:{ ideal:16/9 } } };
-
   if(desiredMode === 'MP'){
     const r = mpToResolution(cfg.MP.mp);
     constraints.video.width = { ideal: r.width };
@@ -237,12 +353,13 @@ async function openCamera(deviceId){
   try {
     stream = await navigator.mediaDevices.getUserMedia(constraints);
     preview.srcObject = stream;
-    await preview.play().catch(()=>{});
-    const track = stream.getVideoTracks()[0];
-    videoTrackCapabilities = track.getCapabilities ? track.getCapabilities() : null;
-    videoTrackSettings = track.getSettings ? track.getSettings() : null;
+    miniVideo.srcObject = stream;
 
-    // try maximize closer to target (MP)
+    const track = stream.getVideoTracks()[0];
+    videoTrackCapabilities = track.getCapabilities?.() || null;
+    videoTrackSettings = track.getSettings?.() || null;
+
+    // tenta aplicar resoluções de forma decrescente para alcançar o melhor
     if(desiredMode === 'MP'){
       const target = mpToResolution(cfg.MP.mp);
       const steps = [
@@ -252,374 +369,702 @@ async function openCamera(deviceId){
         {width:4000,height:3000},
         {width:3264,height:2448},
         {width:1920,height:1080}
-      ].filter(r=>r.width<=target.width && r.height<=target.height);
+      ].filter(r => r.width <= target.width && r.height <= target.height);
       await tryApplyResolutions(track, steps);
     } else {
       const [w,h] = cfg.P.p.split('x').map(Number);
-      await tryApplyResolutions(track, [{width:w,height:h}]);
+      await tryApplyResolutions(track, [{width:w, height:h}]);
     }
 
-    // refresh settings
-    videoTrackSettings = track.getSettings ? track.getSettings() : videoTrackSettings;
-
-    // mini bind
-    if(miniVideo.srcObject !== stream) miniVideo.srcObject = stream;
-
-    // apply persisted zoom by hybrid method
-    await applyZoomHybrid(zoom, {animated:false, persist:false});
-
-    // try continuous focus
-    try {
-      const caps = track.getCapabilities ? track.getCapabilities() : {};
-      if(caps.focusMode && Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')){
+    // foco contínuo quando suportado
+    try{
+      const caps = track.getCapabilities?.() || {};
+      if(caps.focusMode?.includes?.('continuous')){
         await track.applyConstraints({ advanced:[{ focusMode:'continuous' }] });
       }
-    } catch(e){ /* ignore */ }
+    }catch(e){
+      logSuspend('openCamera: aplicar focusMode falhou -> '+String(e));
+    }
+
+    // criar ImageCapture se possível
+    try{
+      imageCapture = new ImageCapture(track);
+    }catch(e){
+      imageCapture = null;
+    }
+
+    // aplicar zoom final salvo
+    try { await applyZoomFinalize(zoom); } catch(e){}
 
     updateCameraInfo();
-    if(zoom>2) showMini(); else hideMini();
-    setupMiniRAF();
-
+    connectStatus.textContent = 'Pronto';
+    if(zoom > 2) showMini(); else hideMini();
+    logSuspend('openCamera: sucesso e stream atribuído');
   } catch(err){
-    console.error('openCamera',err);
-    alert('Erro ao abrir câmera: '+(err && err.message ? err.message : err));
+    logSuspend('openCamera: erro ao abrir -> ' + String(err));
+    alert('Erro ao abrir câmera: '+(err?.message || err));
+    connectStatus.textContent = 'Erro';
   }
 }
 
-/* ---------- hybrid zoom: hardware when available + digital scale ---------- */
-async function applyZoomHybrid(target, opts={animated:true,persist:true}){
-  target = clamp(Math.round(target), 1, 100); // integer zoom >=1
-  const track = stream ? stream.getVideoTracks()[0] : null;
-  const hasHW = !!(videoTrackCapabilities && 'zoom' in videoTrackCapabilities && track && track.applyConstraints);
-  const hwMin = hasHW ? Number(videoTrackCapabilities.zoom.min || 1) : 1;
-  const hwMax = hasHW ? Number(videoTrackCapabilities.zoom.max || 1) : 1;
+/* =========================
+   Mini-view show/hide
+   ========================= */
+function showMini(){ miniWrap.style.display = 'block'; }
+function hideMini(){ miniWrap.style.display = 'none'; }
 
-  if(opts.animated){
-    // animate from current zoom to target via RAF, integer steps
-    const start = zoom;
-    const steps = Math.max(6, Math.abs(target - start)); // more steps for larger jumps
-    for(let i=1;i<=steps;i++){
-      const t = start + (target-start)*(i/steps);
-      const z = Math.round(t);
-      if(hasHW){
-        const hw = clamp(z, hwMin, hwMax);
-        try{ await track.applyConstraints({ advanced:[{ zoom: hw }] }); } catch(e){}
-        const digital = z / (hasHW ? hw : 1);
-        applyDigital(digital);
-      } else {
-        applyDigital(z);
-      }
-      zoom = z;
-      refreshZoomText();
-      await delay(16);
-    }
-  } else {
-    if(hasHW){
-      const hw = clamp(target, hwMin, hwMax);
-      try{ await track.applyConstraints({ advanced:[{ zoom: hw }] }); } catch(e){}
-      applyDigital(target / hw);
-    } else {
-      applyDigital(target);
-    }
-    zoom = Math.round(target);
-    refreshZoomText();
-  }
-
-  if(opts.persist) { localStorage.setItem('cam_zoom_v3', String(zoom)); }
-}
-
-function applyDigital(factor){
-  factor = Math.max(1, factor || 1);
-  preview.style.transform = `scale(${factor})`;
-  // mini visibility handled elsewhere
-}
-
+/* =========================
+   Zoom UI helpers
+   ========================= */
 function refreshZoomText(){
-  zoomText.textContent = `${zoom}×`;
+  zoomText.textContent = `${formatZoom(zoom)}×`;
   zoomText.classList.add('show');
-  setTimeout(()=>zoomText.classList.remove('show'),900);
-  cameraInfo.textContent = `Wide • ${zoom}×`;
+  setTimeout(()=>zoomText.classList.remove('show'), 700);
 }
-
-/* ---------- animate to targetZoom (smooth) ---------- */
-let rafAnim = null;
-function animateToTarget(){
-  if(rafAnim) cancelAnimationFrame(rafAnim);
-  const step = ()=>{
-    if(zoom === targetZoom) return;
-    const diff = targetZoom - zoom;
-    // move 30% of difference then round to integer
-    let next = zoom + Math.sign(diff) * Math.max(1, Math.round(Math.abs(diff)*0.3));
-    next = clamp(Math.round(next), 1, 100);
-    applyZoomHybrid(next, {animated:false,persist:false}).then(()=>{
-      if(next !== targetZoom) rafAnim = requestAnimationFrame(step);
-    });
-  };
-  rafAnim = requestAnimationFrame(step);
+function updateCameraInfo(){
+  cameraInfo.textContent = `Wide • ${formatZoom(zoom)}× • ${videoTrackSettings?.width||'?'}×${videoTrackSettings?.height||'?'}`;
 }
+function formatZoom(z){ return (z>=10?Math.round(z):Math.max(1,Math.round(z*10)/10)); }
 
-/* ---------- presets click ---------- */
-presets.querySelectorAll('.preset').forEach(btn=>{
-  btn.addEventListener('click', async ()=>{
-    const z = clamp(Math.round(Number(btn.dataset.zoom)),1,100);
-    targetZoom = z;
-    await applyZoomHybrid(z, {animated:true,persist:true});
-    // toggle active
-    presets.querySelectorAll('.preset').forEach(p=>p.classList.remove('active'));
-    btn.classList.add('active');
-  });
-});
-
-/* ---------- pinch support (integer zoom) ---------- */
-let pinchStartDist = null, pinchStartZoom = null;
-view.addEventListener('touchstart', e=>{
-  if(e.touches.length === 2){
-    pinchStartDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-    pinchStartZoom = zoom;
-    // show zoom text briefly
-    zoomText.classList.add('show');
-  }
-}, {passive:false});
-
-view.addEventListener('touchmove', e=>{
-  if(e.touches.length === 2 && pinchStartDist){
-    e.preventDefault();
-    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-    const ratio = d / pinchStartDist;
-    let desired = Math.round(pinchStartZoom * ratio);
-    desired = clamp(desired, 1, 100);
-    // apply quickly but integer
-    targetZoom = desired;
-    animateToTarget();
-  }
-}, {passive:false});
-
-view.addEventListener('touchend', async e=>{
-  if(e.touches.length < 2){
-    pinchStartDist = null;
-    pinchStartZoom = null;
-    // persist current zoom
-    localStorage.setItem('cam_zoom_v3', String(zoom));
-  }
-}, {passive:true});
-
-/* ---------- mini view rectangle logic (active only when zoom>2) ---------- */
-let miniRAF = null;
-function showMini(){ miniWrap.style.display = 'block'; startMiniRAF(); }
-function hideMini(){ miniWrap.style.display = 'none'; stopMiniRAF(); }
-function startMiniRAF(){
-  if(miniRAF) return;
-  const loop = ()=>{
-    updateMiniRect();
-    miniRAF = requestAnimationFrame(loop);
-  };
-  miniRAF = requestAnimationFrame(loop);
-}
-function stopMiniRAF(){ if(miniRAF) cancelAnimationFrame(miniRAF); miniRAF = null; }
+/* =========================
+   Mini rect cálculo geométrico (1x mini view)
+   ========================= */
 function updateMiniRect(){
-  if(zoom <= 2){ miniRect.style.display='none'; return; }
-  if(!miniVideo.clientWidth || !miniVideo.clientHeight){ miniRect.style.display='none'; return; }
-  miniRect.style.display='block';
-  // visible fraction = 1 / digitalScale
-  // we used preview.transform = scale(digitalFactor)
-  // We approximate digitalFactor by zoom / hwZoomApplied (but we used integer zoom equalization)
-  const digitalFactor = Math.max(1, zoom); // conservative
-  const frac = 1 / digitalFactor;
-  const w = miniVideo.clientWidth * frac;
-  const h = miniVideo.clientHeight * frac;
-  const left = (miniVideo.clientWidth - w)/2;
-  const top = (miniVideo.clientHeight - h)/2;
+  if(zoom <= 1){ miniRect.style.display = 'none'; return; }
+  if(!miniVideo.clientWidth || !miniVideo.clientHeight){ miniRect.style.display = 'none'; return; }
+  miniRect.style.display = 'block';
+  const mw = miniVideo.clientWidth, mh = miniVideo.clientHeight;
+  const frac = 1/zoom;
+  const w = mw * frac, h = mh * frac;
+  const left = (mw - w) / 2, top = (mh - h) / 2;
   miniRect.style.width = `${w}px`;
   miniRect.style.height = `${h}px`;
   miniRect.style.left = `${left}px`;
   miniRect.style.top = `${top}px`;
 }
 
-/* ---------- shutter / capture ---------- */
+/* =========================
+   Zoom live and finalize
+   ========================= */
+function applyZoomLiveDigital(z){
+  z = clamp(z, 1, 100);
+  preview.classList.add('during-zoom');
+  preview.style.transform = `scale(${z})`;
+  zoom = z;
+  refreshZoomText();
+  updateMiniRect();
+  if(zoom>2) showMini(); else hideMini();
+  updateCameraInfo();
+}
+
+async function applyZoomFinalize(z){
+  z = clamp(Math.round(z*10)/10, 1, 100);
+  const track = stream?.getVideoTracks?.()[0];
+  const hasHW = !!(videoTrackCapabilities && 'zoom' in videoTrackCapabilities && track?.applyConstraints);
+  let appliedHW = 1;
+  if(hasHW){
+    const hwMin = Number(videoTrackCapabilities.zoom.min || 1);
+    const hwMax = Number(videoTrackCapabilities.zoom.max || 1);
+    const hwTarget = clamp(z, hwMin, hwMax);
+    try{
+      await track.applyConstraints({ advanced:[{ zoom: hwTarget }] });
+      const s = track.getSettings?.() || {};
+      appliedHW = Number(s.zoom || hwTarget) || hwTarget;
+    }catch(e){
+      logSuspend('applyZoomFinalize: aplicar zoom HW falhou -> '+String(e));
+      appliedHW = 1;
+    }
+  }
+  const digitalFactor = Math.max(1, z / appliedHW);
+  preview.style.transform = digitalFactor>1 ? `scale(${digitalFactor})` : 'scale(1)';
+  preview.classList.remove('during-zoom');
+  zoom = z;
+  localStorage.setItem('cam_zoom_v5_2', String(zoom));
+  refreshZoomText();
+  updateMiniRect();
+  if(zoom>2) showMini(); else hideMini();
+  try{ videoTrackSettings = stream?.getVideoTracks?.()[0]?.getSettings?.() || videoTrackSettings; }catch(e){}
+  updateCameraInfo();
+}
+
+/* =========================
+   Gestos pinch / wheel
+   ========================= */
+let pinchStartDist = null, pinchStartZoom = null;
+view.addEventListener('touchstart', e=>{
+  if(e.touches.length === 2){
+    pinchStartDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    pinchStartZoom = zoom;
+    zoomText.classList.add('show');
+  }
+},{passive:true});
+
+view.addEventListener('touchmove', e=>{
+  if(e.touches.length === 2 && pinchStartDist){
+    e.preventDefault();
+    const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    const ratio = d / pinchStartDist;
+    const z = clamp(pinchStartZoom * ratio, 1, 100);
+    applyZoomLiveDigital(z);
+  }
+},{passive:false});
+
+view.addEventListener('touchend', async e=>{
+  if(e.touches.length < 2 && pinchStartDist){
+    pinchStartDist = null; pinchStartZoom = null;
+    await applyZoomFinalize(zoom);
+  }
+},{passive:true});
+
+view.addEventListener('wheel', e=>{
+  if(Math.abs(e.deltaY) < 1) return;
+  e.preventDefault();
+  const dir = e.deltaY < 0 ? 1 : -1;
+  const z = clamp(zoom + dir*0.2, 1, 100);
+  applyZoomLiveDigital(z);
+  clearTimeout(view.__wheelT);
+  view.__wheelT = setTimeout(()=>applyZoomFinalize(zoom), 140);
+},{passive:false});
+
+/* =========================
+   Presets wiring
+   ========================= */
+presets.querySelectorAll('.preset').forEach(btn=>{
+  btn.addEventListener('click', async ()=>{
+    presets.querySelectorAll('.preset').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    const z = clamp(Number(btn.dataset.zoom) || 1, 1, 100);
+    applyZoomLiveDigital(z);
+    await applyZoomFinalize(z);
+  });
+});
+
+/* =========================
+   Blob -> DataURL
+   ========================= */
+function blobToDataURL(blob){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = ()=>res(fr.result);
+    fr.onerror = rej;
+    fr.readAsDataURL(blob);
+  });
+}
+
+/* =========================
+   Galeria local
+   ========================= */
+function pushPhoto(item){
+  item.ts = Date.now();
+  if(photos.length >= MAX_PHOTOS) photos.shift();
+  photos.push(item);
+  localStorage.setItem('cam_photos_v5_2', JSON.stringify(photos));
+  refreshGalleryList();
+  logSuspend(`pushPhoto: guardado item tipo=${item.type} super=${!!item.super} parts=${item.parts||0}`);
+}
+function refreshGalleryList(){
+  galleryList.innerHTML = '';
+  photos.slice().reverse().forEach((p,i)=>{
+    const wrap = document.createElement('div'); wrap.className = 'gallery-item';
+    if(p.type === 'image'){
+      const img = document.createElement('img'); img.src = p.dataUrl; wrap.appendChild(img);
+      const a = document.createElement('a'); a.href = p.dataUrl; a.download = `photo_${photos.length-i}.jpg`; a.textContent = 'Download'; a.style.color = '#0f0'; a.style.display = 'block'; a.style.marginTop = '6px';
+      wrap.appendChild(a);
+      if(p.super){
+        const info = document.createElement('div'); info.style.fontSize='12px'; info.style.color='var(--muted)'; info.textContent = `Super Pixel: ${p.parts}x (${p.composedWidth}×${p.composedHeight})`; wrap.appendChild(info);
+      }
+    } else if(p.type === 'video'){
+      const vid = document.createElement('video'); vid.src = p.dataUrl; vid.controls = true; wrap.appendChild(vid);
+      const a = document.createElement('a'); a.href = p.dataUrl; a.download = `clip_${photos.length-i}.webm`; a.textContent = 'Download'; a.style.color = '#0f0'; a.style.display = 'block'; a.style.marginTop = '6px';
+      wrap.appendChild(a);
+    } else if(p.type === 'package'){
+      const info = document.createElement('div'); info.style.fontSize='13px'; info.style.color='var(--muted)'; info.textContent = `Pacote Super (${p.parts} imagens)`; wrap.appendChild(info);
+      (p.items || []).forEach((d, idx)=>{
+        const img = document.createElement('img'); img.src = d; img.style.marginTop='8px'; wrap.appendChild(img);
+      });
+    }
+    galleryList.appendChild(wrap);
+  });
+}
+
+/* =========================
+   Segurança: stop stream quando aba oculta
+   ========================= */
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    connectStatus.textContent = 'Pausado';
+    logSuspend('visibilitychange: aba oculta, stream parado para economizar recursos.');
+  } else {
+    // reabrir camera se estava aberto antes (tentativa)
+    if(chosenDeviceId) openCamera(chosenDeviceId).catch(()=>{});
+  }
+});
+
+/* =========================
+   Process overlay helpers
+   ========================= */
+function showProcessing(title='Processando', msg='Aguarde...', progress=0){
+  processingTitle.textContent = title;
+  processingMsg.textContent = msg;
+  processingBar.style.width = `${progress}%`;
+  processingOverlay.style.display = 'block';
+  processingOverlay.setAttribute('aria-hidden','false');
+  logSuspend(`showProcessing: ${title} - ${msg}`);
+}
+function updateProcessing(msg, progress){
+  if(processingOverlay.style.display === 'none') showProcessing('Processando', msg, progress||0);
+  processingMsg.textContent = msg;
+  processingBar.style.width = `${progress||0}%`;
+  logSuspend(`updateProcessing: ${msg} (${progress}%)`);
+}
+function hideProcessing(){
+  processingOverlay.style.display = 'none';
+  processingOverlay.setAttribute('aria-hidden','true');
+  processingBar.style.width = '0%';
+  logSuspend('hideProcessing');
+}
+
+/* =========================
+   Detecta se a câmera suporta o MP pedido
+   ========================= */
+function cameraSupportsMP(targetMP){
+  const target = mpToResolution(targetMP);
+  const curW = videoTrackSettings?.width || 0;
+  const curH = videoTrackSettings?.height || 0;
+  if(curW && curH){
+    if(curW >= target.width*0.9 && curH >= target.height*0.9) return true;
+  }
+  const capWmax = videoTrackCapabilities?.width?.max || 0;
+  const capHmax = videoTrackCapabilities?.height?.max || 0;
+  if(capWmax && capHmax){
+    if(capWmax >= target.width*0.9 && capHmax >= target.height*0.9) return true;
+  }
+  return false;
+}
+
+/* =========================
+   Captura múltiplas fotos (ImageCapture) -> retorna array de Blobs
+   ========================= */
+async function captureMultiplePhotos(count, opts){
+  if(!stream) throw new Error('Stream indisponível');
+  const track = stream.getVideoTracks?.()[0];
+  if(!track) throw new Error('Track não disponível');
+  if(!window.ImageCapture || !imageCapture) throw new Error('ImageCapture não suportado');
+  const blobs = [];
+  for(let i=0;i<count;i++){
+    if(processingAbort) throw new Error('cancelado');
+    try{
+      // ajuste de exposição entre capturas pode ser necessário, adicionar pequenos delays
+      await delay(80);
+      const b = await imageCapture.takePhoto(opts).catch(err=>{ throw err; });
+      blobs.push(b);
+      updateProcessing(`Capturando parte ${i+1}/${count}`, Math.round((i+1)/count*30));
+    }catch(e){
+      logSuspend('captureMultiplePhotos: falha em takePhoto -> '+String(e));
+      throw e;
+    }
+  }
+  return blobs;
+}
+
+/* =========================
+   Converte Blobs em ImageBitmap
+   ========================= */
+async function blobsToBitmaps(blobs){
+  const bitmaps = [];
+  for(let i=0;i<blobs.length;i++){
+    if(processingAbort) throw new Error('cancelado');
+    try{
+      const ib = await createImageBitmap(blobs[i]);
+      bitmaps.push(ib);
+      updateProcessing(`Convertendo ${i+1}/${blobs.length}`, 30 + Math.round((i+1)/blobs.length*15));
+    }catch(e){
+      logSuspend('blobsToBitmaps: createImageBitmap falhou -> '+String(e));
+      throw e;
+    }
+  }
+  return bitmaps;
+}
+
+/* =========================
+   Média pixel a pixel (stacking)
+   bitmaps -> ImageData array -> merged ImageData
+   ========================= */
+function averageImageData(imageDatas){
+  if(!imageDatas.length) throw new Error('Nenhum ImageData para mesclar');
+  const w = imageDatas[0].width;
+  const h = imageDatas[0].height;
+  const merged = new ImageData(w, h);
+  const length = merged.data.length;
+  const parts = imageDatas.length;
+
+  // iterar por pixel. Trabalha em blocos para performance.
+  for(let i=0;i<length;i+=4){
+    let r=0,g=0,b=0,a=0;
+    for(let p=0;p<parts;p++){
+      const d = imageDatas[p].data;
+      r += d[i]; g += d[i+1]; b += d[i+2]; a += d[i+3];
+    }
+    merged.data[i]   = Math.round(r / parts);
+    merged.data[i+1] = Math.round(g / parts);
+    merged.data[i+2] = Math.round(b / parts);
+    merged.data[i+3] = Math.round(a / parts);
+  }
+  return merged;
+}
+
+/* =========================
+   Stitch / upscale: desenha mergedImageData (w,h) em canvas final (targetW,targetH)
+   Retorna Blob (jpeg)
+   ========================= */
+async function stitchAndUpscale(mergedImageData, targetW, targetH, mime='image/jpeg', quality=0.94){
+  // Proteção contra canvas gigantes
+  const MAX_CANVAS_PIXELS = 12000 * 12000; // teórico, muitos navegadores falham antes disso
+  if(targetW * targetH > MAX_CANVAS_PIXELS) throw new Error('Tamanho da composição excede limite seguro do canvas');
+
+  try{
+    stitchCanvas.width = mergedImageData.width;
+    stitchCanvas.height = mergedImageData.height;
+    const ctx = stitchCanvas.getContext('2d');
+    ctx.putImageData(mergedImageData, 0, 0);
+
+    // upscale: desenha em canvas final (novo)
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = targetW;
+    finalCanvas.height = targetH;
+    const fctx = finalCanvas.getContext('2d');
+
+    // opção de preservar nitidez: desenhar com imageSmoothingQuality
+    fctx.imageSmoothingEnabled = true;
+    fctx.imageSmoothingQuality = 'high';
+
+    // draw scaled
+    fctx.drawImage(stitchCanvas, 0, 0, mergedImageData.width, mergedImageData.height, 0, 0, targetW, targetH);
+
+    updateProcessing('Gerando imagem final', 90);
+
+    const blob = await new Promise((res, rej) => {
+      finalCanvas.toBlob(b => {
+        if(b) res(b); else rej(new Error('toBlob retornou nulo'));
+      }, mime, quality);
+    });
+
+    updateProcessing('Concluído', 100);
+    return blob;
+  }catch(e){
+    logSuspend('stitchAndUpscale: erro -> '+String(e));
+    throw e;
+  }
+}
+
+/* =========================
+   Captura Super Pixel (stacking + upscale)
+   parts: 3 (36MP) ou 4 (48MP)
+   ========================= */
+async function captureSuperPixel(parts){
+  processingAbort = false;
+  try{
+    showProcessing('Processando Super Pixel','Iniciando captura e composição', 5);
+    logSuspend(`captureSuperPixel: iniciar parts=${parts}`);
+
+    // define dimensões base (12MP) e target final
+    const baseMP = 12;
+    const baseRes = mpToResolution(baseMP);
+    const targetMP = baseMP * parts;
+    const targetRes = mpToResolution(targetMP);
+
+    // check abort
+    processingCancel.onclick = ()=>{ processingAbort = true; logSuspend('Usuário cancelou process'); };
+
+    // 1) Captura N fotos em 12MP
+    let blobs;
+    try{
+      const opts = { imageWidth: baseRes.width, imageHeight: baseRes.height };
+      updateProcessing('Capturando imagens (fase 1)', 10);
+      blobs = await captureMultiplePhotos(parts, opts);
+    }catch(e){
+      hideProcessing();
+      throw new Error('Falha ao capturar fotos: ' + (e?.message || e));
+    }
+
+    if(processingAbort){ hideProcessing(); throw new Error('cancelado'); }
+
+    // 2) Converter blobs -> bitmaps
+    updateProcessing('Convertendo imagens', 30);
+    const bitmaps = await blobsToBitmaps(blobs);
+
+    if(processingAbort){ hideProcessing(); throw new Error('cancelado'); }
+
+    // 3) obter ImageData de cada bitmap
+    updateProcessing('Extraindo pixels', 45);
+    const imageDatas = [];
+    for(let i=0;i<bitmaps.length;i++){
+      if(processingAbort) throw new Error('cancelado');
+      const bm = bitmaps[i];
+      const tmpCanvas = document.createElement('canvas');
+      tmpCanvas.width = bm.width;
+      tmpCanvas.height = bm.height;
+      const tctx = tmpCanvas.getContext('2d');
+      tctx.drawImage(bm, 0, 0);
+      const id = tctx.getImageData(0,0,tmpCanvas.width,tmpCanvas.height);
+      imageDatas.push(id);
+      updateProcessing(`Extraindo pixels ${i+1}/${bitmaps.length}`, 45 + Math.round((i+1)/bitmaps.length*10));
+      // liberar bitmap
+      try{ bm.close?.(); }catch(e){}
+    }
+
+    if(processingAbort){ hideProcessing(); throw new Error('cancelado'); }
+
+    // 4) média pixel a pixel
+    updateProcessing('Mesclando imagens (stacking)', 60);
+    const merged = averageImageData(imageDatas);
+
+    if(processingAbort){ hideProcessing(); throw new Error('cancelado'); }
+
+    // 5) stitch + upscale para target resolution
+    updateProcessing('Compondo e ampliando imagem', 70);
+    let composedBlob;
+    try{
+      composedBlob = await stitchAndUpscale(merged, targetRes.width, targetRes.height, 'image/jpeg', 0.94);
+    }catch(e){
+      // tentativa alternativa: se tamanho muito grande, reduzir upscale para metade e avisar
+      logSuspend('captureSuperPixel: stitch falhou -> ' + String(e));
+      // fallback: tentar upscale moderado (meia resolução)
+      try{
+        updateProcessing('Fallback: tentanto composição em resolução intermediária', 75);
+        const fallbackW = Math.min(8000, Math.floor(targetRes.width/2));
+        const fallbackH = Math.min(6000, Math.floor(targetRes.height/2));
+        composedBlob = await stitchAndUpscale(merged, fallbackW, fallbackH, 'image/jpeg', 0.92);
+        logSuspend('captureSuperPixel: fallback succeed at ' + fallbackW + 'x' + fallbackH);
+      }catch(err2){
+        // se tudo falhar, salvar pacote das imagens separadas
+        hideProcessing();
+        logSuspend('captureSuperPixel: fallback também falhou. Salvando pacote de imagens individuais.');
+        const dataUrls = [];
+        for(const b of blobs){ dataUrls.push(await blobToDataURL(b)); }
+        pushPhoto({ type:'package', items:dataUrls, parts });
+        return;
+      }
+    }
+
+    if(processingAbort){ hideProcessing(); throw new Error('cancelado'); }
+
+    // 6) push final composto na galeria
+    const dataUrl = await blobToDataURL(composedBlob);
+    const composedWidth = targetRes.width;
+    const composedHeight = targetRes.height;
+    pushPhoto({ type:'image', dataUrl, super:true, parts, composedWidth, composedHeight });
+    hideProcessing();
+    logSuspend('captureSuperPixel: concluído com sucesso');
+  }catch(err){
+    hideProcessing();
+    if(String(err).toLowerCase().includes('cancelado')) {
+      alert('Captura cancelada pelo usuário.');
+      logSuspend('captureSuperPixel: cancelado pelo usuário.');
+    } else {
+      alert('Erro no Super Pixel: ' + (err?.message || err));
+      logSuspend('captureSuperPixel: erro final -> '+String(err));
+    }
+  } finally {
+    processingAbort = false;
+  }
+}
+
+/* =========================
+   Função principal de captura (integra Super Pixel)
+   ========================= */
 async function captureImage(){
   shutter.disabled = true;
-  flashQuick();
   try{
-    const track = stream ? stream.getVideoTracks()[0] : null;
-    let blob = null;
+    // flash UI
+    flashEffect();
 
-    // prefer ImageCapture.takePhoto if available
-    if(window.ImageCapture && track){
+    const track = stream?.getVideoTracks?.()[0];
+    if(!track){ alert('Câmera indisponível'); shutter.disabled = false; return; }
+
+    // Se modo MP e selecionado 36/48 e câmera não suportar, chamar SuperPixel
+    if(desiredMode === 'MP'){
+      const requestedMP = Number(cfg.MP.mp);
+      if((requestedMP === 36 || requestedMP === 48) && !cameraSupportsMP(requestedMP)){
+        const parts = requestedMP / 12; // 36=>3, 48=>4
+        await captureSuperPixel(parts);
+        shutter.disabled = false;
+        return;
+      }
+    }
+
+    // Caso normal: preferir ImageCapture.takePhoto
+    if(window.ImageCapture && imageCapture){
       try{
-        const ic = new ImageCapture(track);
-        // try native size hints based on mode
         const opts = {};
-        if(desiredMode === 'MP'){ const r = mpToResolution(cfg.MP.mp); opts.imageWidth = r.width; opts.imageHeight = r.height; }
-        else { const [w,h] = cfg.P.p.split('x').map(Number); opts.imageWidth = w; opts.imageHeight = h; }
-        blob = await ic.takePhoto(opts).catch(async ()=>{
-          // try without opts
-          return await ic.takePhoto().catch(()=>null);
-        });
+        if(desiredMode === 'MP'){
+          const r = mpToResolution(cfg.MP.mp);
+          opts.imageWidth = r.width; opts.imageHeight = r.height;
+        } else {
+          const [w,h] = cfg.P.p.split('x').map(Number);
+          opts.imageWidth = w; opts.imageHeight = h;
+        }
+        const blob = await imageCapture.takePhoto(opts).catch(()=>imageCapture.takePhoto());
+        if(blob){
+          const dataUrl = await blobToDataURL(blob);
+          pushPhoto({ type:'image', dataUrl });
+          shutter.disabled = false;
+          return;
+        }
       }catch(e){
-        console.warn('ImageCapture failed', e);
-        blob = null;
+        logSuspend('captureImage: ImageCapture.takePhoto falhou -> '+String(e));
+        // cair para fallback
       }
     }
 
-    // fallback to canvas drawImage
-    if(!blob){
-      const ctx = canvas.getContext('2d');
-      const vw = preview.videoWidth, vh = preview.videoHeight;
-      canvas.width = vw; canvas.height = vh;
-      ctx.clearRect(0,0,vw,vh);
-      ctx.drawImage(preview, 0, 0, vw, vh);
-      // if zoom >1 crop center
-      if(zoom > 1){
-        const cw = Math.round(vw / zoom), ch = Math.round(vh / zoom);
-        const cx = Math.round((vw - cw)/2), cy = Math.round((vh - ch)/2);
-        const im = ctx.getImageData(cx,cy,cw,ch);
-        canvas.width = cw; canvas.height = ch; ctx.putImageData(im,0,0);
-      }
-      blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
+    // fallback: grava curto clipe WebM e salva como "video"
+    const recBlob = await recordShortClip(stream, 300);
+    if(recBlob){
+      const dataUrl = await blobToDataURL(recBlob);
+      pushPhoto({ type:'video', dataUrl });
+    } else {
+      alert('Falha ao capturar. Tente novamente.');
     }
-
-    if(blob){
-      const dataUrl = await blobToDataURL(blob);
-      if(photos.length >= MAX_PHOTOS) photos.shift();
-      photos.push({ dataUrl, ts: Date.now() });
-      localStorage.setItem('cam_photos_v3', JSON.stringify(photos));
-      refreshGalleryList();
-    }
-
   }catch(err){
-    console.error('capture error', err);
-    alert('Erro ao capturar: '+(err && err.message?err.message:err));
+    alert('Erro ao capturar: ' + (err?.message || err));
+    logSuspend('captureImage: erro -> '+String(err));
   } finally {
     shutter.disabled = false;
   }
 }
 
-function blobToDataURL(blob){ return new Promise((res,rej)=>{ const fr = new FileReader(); fr.onload = ()=>res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob); }); }
-
-function flashQuick(){ flashOverlayEffect(); }
-function flashOverlayEffect(){ const el = document.createElement('div'); el.style.position='fixed'; el.style.inset='0'; el.style.background='white'; el.style.opacity='0'; el.style.zIndex='9999'; document.body.appendChild(el); el.style.transition='opacity .12s'; requestAnimationFrame(()=>el.style.opacity='0.85'); setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>el.remove(),160); },140); }
-
-/* ---------- gallery ---------- */
-function refreshGalleryList(){
-  galleryList.innerHTML = '';
-  photos.slice().reverse().forEach((p,i)=>{
-    const wrapper = document.createElement('div'); wrapper.className='gallery-item';
-    const img = document.createElement('img'); img.src = p.dataUrl;
-    const a = document.createElement('a'); a.href=p.dataUrl; a.download=`photo_${photos.length-i}.jpg`; a.textContent='Download';
-    a.style.color='#0f0'; a.style.display='block'; a.style.marginTop='6px';
-    wrapper.appendChild(img); wrapper.appendChild(a); galleryList.appendChild(wrapper);
+/* =========================
+   MediaRecorder curto
+   ========================= */
+function recordShortClip(ms=200){
+  return new Promise((resolve)=>{
+    if(!stream || !window.MediaRecorder){ resolve(null); return; }
+    let chunks = [];
+    let mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+    let rec;
+    try{
+      rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 1_500_000 });
+    }catch(e){ resolve(null); return; }
+    rec.ondataavailable = e => { if(e.data?.size) chunks.push(e.data); };
+    rec.onstop = () => { resolve(new Blob(chunks, { type: mime })); };
+    rec.start();
+    setTimeout(()=>{ try{ rec.stop(); } catch(e){ resolve(null); } }, ms);
   });
 }
 
-/* ---------- UI wiring ---------- */
-agreeBtn.addEventListener('click', async ()=>{
-  consent.style.display = 'none';
-  app.style.display = 'block';
-  app.setAttribute('aria-hidden','false');
-  // pick main rear and open
-  try{
-    const devId = await pickRearMain();
-    if(!devId){
-      alert('Nenhuma câmera traseira encontrada'); return;
-    }
-    await openCamera(devId);
-  }catch(e){ console.error(e); alert('Erro ao iniciar câmera: '+(e && e.message?e.message:e)); }
+/* =========================
+   Flash overlay (visual)
+   ========================= */
+function flashEffect(){
+  const el = document.createElement('div');
+  el.style.position = 'fixed'; el.style.inset = '0'; el.style.background = 'white';
+  el.style.opacity = '0'; el.style.zIndex = 99999; el.style.transition = 'opacity .12s';
+  document.body.appendChild(el);
+  requestAnimationFrame(()=> el.style.opacity = '0.85');
+  setTimeout(()=>{ el.style.opacity = '0'; setTimeout(()=>el.remove(),160); }, 140);
+}
+
+/* =========================
+   UI wiring: botões e eventos
+   ========================= */
+$('suspend-btn').addEventListener('click', ()=>{
+  const panel = suspendPanel;
+  if(panel.style.display === 'block'){ panel.style.display = 'none'; suspendBtn.textContent = 'CONTINUAR'; }
+  else{ panel.style.display = 'block'; suspendBtn.textContent = 'OCULTAR'; }
 });
 
-declineBtn.addEventListener('click', ()=>{ alert('Acesso negado.'); });
+$('processing-cancel').addEventListener('click', ()=>{ processingAbort = true; logSuspend('Usuário solicitou cancelamento do processamento'); });
 
-shutter.addEventListener('click', captureImage);
-
-galleryBtn.addEventListener('click', ()=>{ galleryPanel.classList.toggle('open'); refreshGalleryList(); });
-closeGallery.addEventListener('click', ()=>galleryPanel.classList.remove('open'));
-
-settingsToggle.addEventListener('click', ()=>settingsPanel.style.display = settingsPanel.style.display === 'block' ? 'none' : 'block');
+$('settings-toggle').addEventListener('click', ()=>{ settingsPanel.style.display = settingsPanel.style.display === 'block' ? 'none' : 'block'; });
 
 applyRes.addEventListener('click', async ()=>{
-  // read selections and re-open camera with new resolution
   cfg.MP.mp = mpSelect.value;
   cfg.P.p = pSelect.value;
-  localStorage.setItem('cam_mp_v3', cfg.MP.mp);
-  localStorage.setItem('cam_p_v3', cfg.P.p);
-  showTemp('Aplicando resolução...', 800);
+  localStorage.setItem('cam_mp_v5_2', cfg.MP.mp);
+  localStorage.setItem('cam_p_v5_2', cfg.P.p);
+  showTemp('Aplicando resolução...', 900);
   if(chosenDeviceId) await openCamera(chosenDeviceId);
 });
 
-function showTemp(txt, ms=1200){
-  cameraInfo.textContent = txt;
-  cameraInfo.classList.add('show');
-  setTimeout(()=>cameraInfo.classList.remove('show'), ms);
-}
-
-/* modes toggle and swipe */
 modeBtns.forEach(btn=>{
   btn.addEventListener('click', async ()=>{
     modeBtns.forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     desiredMode = btn.dataset.mode;
-    localStorage.setItem('cam_mode_v3', desiredMode);
-    // show panels accordingly
-    mpPanel.style.display = desiredMode==='MP' ? 'block' : 'none';
-    pPanel.style.display = desiredMode==='P' ? 'block' : 'none';
+    localStorage.setItem('cam_mode_v5_2', desiredMode);
+    mpPanel.style.display = desiredMode === 'MP' ? 'block' : 'none';
+    pPanel.style.display = desiredMode === 'P' ? 'block' : 'none';
     if(chosenDeviceId) await openCamera(chosenDeviceId);
   });
 });
 
-// initialize UI based on stored state
+/* shutter, gallery, close gallery */
+shutter.addEventListener('click', captureImage);
+galleryBtn.addEventListener('click', ()=>{ galleryPanel.classList.toggle('open'); refreshGalleryList(); });
+closeGallery.addEventListener('click', ()=> galleryPanel.classList.remove('open'));
+
+/* Presets click: handled earlier via delegated NodeList setup */
+/* Init UI */
 (function initUI(){
-  // set mode buttons
   modeBtns.forEach(b=>b.classList.toggle('active', b.dataset.mode === desiredMode));
-  mpPanel.style.display = desiredMode==='MP' ? 'block' : 'none';
-  pPanel.style.display = desiredMode==='P' ? 'block' : 'none';
+  mpPanel.style.display = desiredMode === 'MP' ? 'block' : 'none';
+  pPanel.style.display  = desiredMode === 'P'  ? 'block' : 'none';
   mpSelect.value = cfg.MP.mp;
   pSelect.value = cfg.P.p;
   refreshGalleryList();
   refreshZoomText();
 })();
 
-/* ---------- mini view RAF control on resize / visibility ---------- */
-window.addEventListener('resize', ()=>{ if(zoom>2) updateMiniRect(); });
+/* Resize listener -> update mini rect */
+window.addEventListener('resize', ()=>{ if(zoom>1) updateMiniRect(); });
 
-function setupMiniView(){
-  if(stream && miniVideo.srcObject !== stream) miniVideo.srcObject = stream;
-}
-
-/* show/hide mini helper */
-function showMini(){ miniWrap.style.display='block'; setupMiniView(); startMiniRAF(); }
-function hideMini(){ miniWrap.style.display='none'; stopMiniRAF(); }
-
-/* mini RAF */
-let miniLoop = null;
-function startMiniRAF(){
-  if(miniLoop) return;
-  const loop = ()=>{ updateMiniRect(); miniLoop = requestAnimationFrame(loop); };
-  miniLoop = requestAnimationFrame(loop);
-}
-function stopMiniRAF(){ if(miniLoop) cancelAnimationFrame(miniLoop); miniLoop = null; }
-
-/* ---------- update camera info display ---------- */
-function updateCameraInfo(){
-  cameraInfo.textContent = `Wide • ${zoom}× • ${videoTrackSettings?.width || '?'}×${videoTrackSettings?.height || '?'}`;
-}
-
-/* ---------- pinch and wheel fallback for desktop ---------- */
-view.addEventListener('wheel', e=>{
-  if(Math.abs(e.deltaY) < 1) return;
-  const dir = e.deltaY < 0 ? 1 : -1;
-  targetZoom = clamp(zoom + dir, 1, 100);
-  animateToTarget();
-});
-
-/* ---------- final safety: ensure getUserMedia exists ---------- */
+/* getUserMedia support check */
 if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
-  alert('Seu navegador não suporta getUserMedia. Use um navegador moderno (Chrome/Edge/Firefox/Safari mobile atualizado).'
-  );
+  alert('Seu navegador não suporta getUserMedia. Use Chrome/Edge/Firefox/Safari atualizados.');
 }
 
-/* Expose state for debugging */
-window.__cam_state_v3 = ()=>({
-  chosenDeviceId, devices, zoom, targetZoom, videoTrackSettings, videoTrackCapabilities, photos, desiredMode, cfg
+/* Debug: estado global */
+window.__cam_state_v5_2 = ()=>({
+  chosenDeviceId, devices, zoom, videoTrackSettings, videoTrackCapabilities, photos, desiredMode, cfg, imageCapture
 });
+
+/* =========================
+   Inicialização: pegar câmera automaticamente ao aceitar
+   ========================= */
+(async function initCameraFlow(){
+  app.style.display = 'block';
+  logSuspend('initCameraFlow: iniciando fluxo de inicialização v5.2');
+
+  try{
+    const devId = await pickRearMain();
+    if(!devId){
+      alert('Nenhuma câmera traseira encontrada');
+      connectStatus.textContent = 'Nenhuma câmera';
+      return;
+    }
+    await openCamera(devId);
+  }catch(e){
+    logSuspend('initCameraFlow: erro -> '+String(e));
+  }
+})();
+
+/* =========================
+   Funções utilitárias adicionais
+   ========================= */
+function showTemp(txt, ms=1200){
+  const prev = cameraInfo.textContent;
+  cameraInfo.textContent = txt;
+  cameraInfo.classList.add('show');
+  setTimeout(()=>{ cameraInfo.textContent = prev; cameraInfo.classList.remove('show'); }, ms);
+}
+
+/* =========================
+   LOG inicial para painel suspenso
+   ========================= */
+logSuspend('App v5.2 iniciado');
+logSuspend('Instruções: use o botão de captura. Se selecionar 36MP/48MP e sua câmera não suportar, o app fará Super Pixel com 3/4 fotos e comporá.');
+
 </script>
 </body>
 </html>
